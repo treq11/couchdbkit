@@ -16,7 +16,10 @@
 
 import re
 import sys
-import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 import traceback
 from urllib import unquote
 
@@ -44,10 +47,10 @@ class WSGIRequest(object):
         length = headers.get("CONTENT_LENGTH")
         if self.line["body"] and self.line["body"] != "undefined":
             length = len(self.line["body"])
-            body = StringIO.StringIO(self.line["body"])
-            
+            body = StringIO()
+            body.write(self.line["body"])
         else:
-            body = StringIO.StringIO()
+            body = StringIO()
             
         # path
         script_name, path_info = self.line['path'][:2],  self.line['path'][2:]

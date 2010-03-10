@@ -3,7 +3,10 @@
 # This file is part of couchdbkit released under the MIT license. 
 # See the NOTICE for more information.
 
-import anyjson
+try:
+    from simplejson import json
+except ImportError:
+    import json
 import sys
         
 class External(object):
@@ -41,7 +44,7 @@ class External(object):
     def lines(self):
         line = self.stdin.readline()
         while line:
-            yield anyjson.deserialize(line)
+            yield json.loads(line)
             line = self.stdin.readline()
     
     def run(self):
@@ -54,4 +57,4 @@ class External(object):
             'body': body, 
             'headers': headers
         }
-        self.write(anyjson.serialize(resp))
+        self.write(json.dumps(resp))

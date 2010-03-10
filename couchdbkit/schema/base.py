@@ -17,7 +17,7 @@ from couchdbkit.schema import properties as p
 from couchdbkit.schema.properties import value_to_python, \
 convert_property, MAP_TYPES_PROPERTIES, ALLOWED_PROPERTY_TYPES, \
 LazyDict, LazyList, value_to_json
-from couchdbkit.exceptions import *
+from couchdbkit.errors import *
 from couchdbkit.resource import ResourceNotFound
 
 
@@ -427,11 +427,7 @@ class DocumentBase(DocumentSchema):
 
         doc = self.to_json()
         self._db.save_doc(doc, **params)
-        if '_id' in doc and '_rev' in doc:
-            self._doc.update(doc)
-        elif '_id' in doc:
-            self._doc.update({'_id': doc['_id']})
-
+        self._doc = doc
     store = save
 
     @classmethod
@@ -448,13 +444,17 @@ class DocumentBase(DocumentSchema):
         """
         if cls._db is None:
             raise TypeError("doc database required to save document")
-        docs_to_save= [doc._doc for doc in docs if doc._doc_type == cls._doc_type]
+        docs_to_save= [doc.to_json() for doc in docs \
+                            if doc._doc_type == cls._doc_type]
         if not len(docs_to_save) == len(docs):
             raise ValueError("one of your documents does not have the correct type")
-        cls._db.bulk_save(docs_to_save, use_uuids=use_uuids, all_or_nothing=all_or_nothing)
+        cls._db.save_docs(docs_to_save, all_or_nothing=all_or_nothing, 
+                    use_uuids=use_uuids)
+        [cls.wrap(doc) for doc in docs_to_save]         
+        
 
     @classmethod
-    def get(cls, docid, rev=None, db=None, dynamic_properties=True):
+    def get(cls, docid, db=None, dynamic_properties=True, **params):
         """ get document with `docid`
         """
         if db is not None:
@@ -462,10 +462,11 @@ class DocumentBase(DocumentSchema):
         cls._allow_dynamic_properties = dynamic_properties
         if cls._db is None:
             raise TypeError("doc database required to save document")
-        return cls._db.get(docid, rev=rev, wrapper=cls.wrap)
-
+        return cls._db.open_doc(docid, wrapper=cls.wrap, **params)
+    
     @classmethod
-    def get_or_create(cls, docid=None, db=None, dynamic_properties=True, **params):
+    def get_or_create(cls, docid=None, db=None, dynamic_properties=True, 
+                    **params):
         """ get  or create document with `docid` """
         if db is not None:
             cls._db = db
@@ -479,11 +480,9 @@ class DocumentBase(DocumentSchema):
             obj = cls()
             obj.save(**params)
             return obj
-
-        rev = params.pop('rev', None)
-
+            
         try:
-            return cls._db.get(docid, rev=rev, wrapper=cls.wrap, **params)
+            return cls._db.open_doc(docid, wrapper=cls.wrap, **params)
         except ResourceNotFound:
             obj = cls()
             obj._id = docid
@@ -514,22 +513,21 @@ class AttachmentMixin(object):
 
     """
 
-    def put_attachment(self, content, name=None, content_type=None,
-                content_length=None):
+    def put_attachment(self, content, name=None, headers=None):
         """ Add attachement to a document.
 
         @param content: string or :obj:`File` object.
         @param name: name or attachment (file name).
-        @param content_type: string, mimetype of attachment.
-        If you don't set it, it will be autodetected.
-        @param content_lenght: int, size of attachment.
+        @param headers: optionnal headers like `Content-Length` 
+        or `Content-Type`
 
         @return: bool, True if everything was ok.
         """
         if not hasattr(self, '_db'):
             raise TypeError("doc database required to save document")
-        return self.__class__._db.put_attachment(self._doc, content, name=name,
-            content_type=content_type, content_length=content_length)
+            
+        return self.__class__._db.put_attachment(self._doc, 
+                            content, name=name, headers=headers)
 
     def delete_attachment(self, name):
         """ delete document attachment
@@ -542,27 +540,42 @@ class AttachmentMixin(object):
             raise TypeError("doc database required to save document")
         return self.__class__._db.delete_attachment(self._doc, name)
 
-    def fetch_attachment(self, name, stream=False):
+    def fetch_attachment(self, name, headers=None):
         """ get attachment in a adocument
 
         @param name: name of attachment default: default result
-        @param stream: boolean, response return a ResponseStream object
-        @param stream_size: int, size in bytes of response stream block
+        @param headers: optional headers (like range)
 
-        @return: str or unicode, attachment
+        @return: `couchdbkit.resource.CouchdbResponse` instance
         """
         if not hasattr(self, '_db'):
             raise TypeError("doc database required to save document")
         return self.__class__._db.fetch_attachment(self._doc, name,
-                                            stream=stream)
+                                            headers=headers)
 
 
 class QueryMixin(object):
     """ Mixin that add query methods """
 
     @classmethod
-    def __view(cls, view_type=None, data=None, wrapper=None,
-    dynamic_properties=True, wrap_doc=True, **params):
+    def view(cls, view_name, wrapper=None, dynamic_properties=True,
+        wrap_doc=True, **params):
+        """ Get documents associated view a view.
+        Results of view are automatically wrapped
+        to Document object.
+
+        @params view_name: str, name of view
+        @params wrapper: override default wrapper by your own
+        @dynamic_properties: do we handle properties which aren't in
+        the schema ? Default is True.
+        @wrap_doc: If True, if a doc is present in the row it will be
+        used for wrapping. Default is True.
+        @params params:  params of view
+
+        @return: :class:`simplecouchdb.core.ViewResults` instance. All
+        results are wrapped to current document instance.
+        """
+        
         def default_wrapper(row):
             data = row.get('value')
             docid = row.get('id')
@@ -590,55 +603,8 @@ class QueryMixin(object):
             raise TypeError("wrapper is not a callable")
 
         db = cls.get_db()
-        if view_type == 'view':
-            return db.view(data, wrapper=wrapper, **params)
-        elif view_type == 'temp_view':
-            return db.temp_view(data, wrapper=wrapper, **params)
-        else:
-            raise RuntimeError("bad view_type : %s" % view_type )
+        return db.view(view_name, wrapper=wrapper, **params)
 
-    @classmethod
-    def view(cls, view_name, wrapper=None, dynamic_properties=True,
-    wrap_doc=True, **params):
-        """ Get documents associated view a view.
-        Results of view are automatically wrapped
-        to Document object.
-
-        @params view_name: str, name of view
-        @params wrapper: override default wrapper by your own
-        @dynamic_properties: do we handle properties which aren't in
-        the schema ? Default is True.
-        @wrap_doc: If True, if a doc is present in the row it will be
-        used for wrapping. Default is True.
-        @params params:  params of view
-
-        @return: :class:`simplecouchdb.core.ViewResults` instance. All
-        results are wrapped to current document instance.
-        """
-        return cls.__view(view_type="view", data=view_name, wrapper=wrapper,
-            dynamic_properties=dynamic_properties, wrap_doc=wrap_doc,
-            **params)
-
-    @classmethod
-    def temp_view(cls, design, wrapper=None, dynamic_properties=True,
-    wrap_doc=True, **params):
-        """ Slow view. Like in view method,
-        results are automatically wrapped to
-        Document object.
-
-        @params design: design object, See `simplecouchd.client.Database`
-        @dynamic_properties: do we handle properties which aren't in
-            the schema ?
-        @wrap_doc: If True, if a doc is present in the row it will be
-            used for wrapping. Default is True.
-        @params params:  params of view
-
-        @return: Like view, return a :class:`simplecouchdb.core.ViewResults`
-        instance. All results are wrapped to current document instance.
-        """
-        return cls.__view(view_type="temp_view", data=design, wrapper=wrapper,
-            dynamic_properties=dynamic_properties, wrap_doc=wrap_doc,
-            **params)
 
 class Document(DocumentBase, QueryMixin, AttachmentMixin):
     """

@@ -7,14 +7,14 @@ version_info = (0, 5, 0)
 __version__ =  ".".join(map(str, version_info))
 
 try:
-    from couchdbkit.resource import ResourceNotFound, ResourceConflict,\
-RequestFailed, PreconditionFailed, CouchdbResource
+    from couchdbkit.resource import CouchdbResource
 
-    from couchdbkit.exceptions import InvalidAttachment, DuplicatePropertyError,\
+    from couchdbkit.errors import InvalidAttachment, DuplicatePropertyError,\
 BadValueError, MultipleResultsFound, NoResultFound, ReservedWordError,\
-DocsPathNotFound, BulkSaveError
+DocsPathNotFound, BulkSaveError, ResourceNotFound, ResourceConflict,\
+RequestFailed, PreconditionFailed, Unauthorized
 
-    from couchdbkit.client import Server, Database, ViewResults, View, TempView
+    from couchdbkit.client import Server, Database, View, Uuids
     from couchdbkit.consumer import Consumer
     from couchdbkit.external import External
     from couchdbkit.loaders import BaseDocsLoader, FileSystemDocsLoader

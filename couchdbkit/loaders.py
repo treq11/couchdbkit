@@ -24,10 +24,12 @@ import mimetypes
 import os
 import socket
 import sys
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
-import anyjson
-
-from couchdbkit.exceptions import DocsPathNotFound
+from couchdbkit.errors import DocsPathNotFound
 from couchdbkit.resource import ResourceNotFound
 from couchdbkit.utils import *
 from couchdbkit.macros import *
@@ -42,7 +44,7 @@ class BaseDocsLoader(object):
 
         from couchdbkit import BaseDocsLoader
         import os
-        import anyjson
+        import json
 
         class MyDocsLoader(BaseDocsLoader):
 
@@ -53,7 +55,7 @@ class BaseDocsLoader(object):
                 if not os.path.exists(path):
                     raise DocsPathNotFound
                 with file(path) as f:
-                    source = anyjson.deserialize(f.read().decode('utf-8'))
+                    source = json.loads(f.read().decode('utf-8'))
                 return source
     """
     
@@ -93,9 +95,10 @@ class BaseDocsLoader(object):
                         new_doc['_attachments'] = current.get('_attachments', {})
                     
                     if '_rev' in current:
-                        new_doc['_rev'] = current.get('_rev')
+                        new_doc['_rev'] = current['_rev']
                         
                 if not atomic:
+                    print docid
                     db[docid] = new_doc
                     if docid.startswith('_design/'):
                         self.send_attachments(db, doc, verbose=verbose)
@@ -114,7 +117,8 @@ class BaseDocsLoader(object):
         while True:
             error = False
             try:
-                db.put_attachment(doc, content, filename, content_length=content_length)
+                db.put_attachment(doc, content, filename, 
+                        headers= {'Content-Length': content_length})
             except (socket.error, httplib.BadStatusLine):
                 time.sleep(0.4)
                 error = True
@@ -403,7 +407,7 @@ class FileSystemDocsLoader(BaseDocsLoader):
                         
                 if name.endswith('.json'):
                     try:
-                        content = anyjson.deserialize(content)
+                        content = json.loads(content)
                     except ValueError:
                         if verbose >= 2:
                             print >>sys.stderr, "Json invalid in %s" % current_path

@@ -64,12 +64,13 @@ class ClientServerTestCase(unittest.TestCase):
         for i in range(5):
             doc = {"_id": "test%s" % str(i)}
             self.db.save_doc(doc)
-        self.db.ensure_full_commit()
+            self.db.ensure_full_commit()
         time.sleep(0.5)
         self.assert_(len(self.lines) == 5)
         self.assert_(self.lines[4]["id"] == "test4")
         doc = {"_id": "test5"}
         self.db.save_doc(doc)
+        self.db.ensure_full_commit()
         time.sleep(0.5)
         self.assert_(len(self.lines) == 6)
         self.assert_(self.lines[5]["id"] == "test5")

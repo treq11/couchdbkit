@@ -23,9 +23,11 @@ if not hasattr(sys, 'version_info') or sys.version_info < (2, 5, 0, 'final'):
 
 from setuptools import setup, find_packages
 
+from couchdbkit import __version__
+
 setup(
     name = 'couchdbkit',
-    version = '0.4.5',
+    version = __version__,
 
     description = 'Python couchdb kit',
     long_description = file(
@@ -56,7 +58,7 @@ setup(
 
     install_requires = [
         'restkit>=1.0',
-        'anyjson'
+        'simplejson'
     ],
         
     test_suite='tests',

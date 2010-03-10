@@ -131,12 +131,12 @@ class DocumentTestCase(unittest.TestCase):
 
         doc.save()
         self.assert_(doc._id is not None)
-        doc1 = db.get(doc._id)
+        doc1 = db.open_doc(doc._id)
         self.assert_(doc1['string2'] == "test2")
 
         doc2 = Test(string3="test")
         doc2.save()
-        doc3 = db.get(doc2._id)
+        doc3 = db.open_doc(doc2._id)
         self.assert_(doc3['string3'] == "test")
 
         self.server.delete_db('couchdbkit_test')
@@ -199,7 +199,7 @@ class DocumentTestCase(unittest.TestCase):
     
         doc2.string3 = "blah"
         doc2.save()
-        doc3 = db.get(doc2._id)
+        doc3 = db.open_doc(doc2._id)
         self.assert_(doc3)
 
         self.server.delete_db('couchdbkit_test')
@@ -420,31 +420,7 @@ class DocumentTestCase(unittest.TestCase):
         results = TestDoc.view('test/all')
         self.assert_(len(results) == 2)
         self.server.delete_db('couchdbkit_test')
-        
 
-    def testTempView(self):
-        class TestDoc(Document):
-            field1 = StringProperty()
-            field2 = StringProperty()
-        
-        design_doc = {
-            "map": """function(doc) { if (doc.doc_type == "TestDoc") { emit(doc._id, doc);
-}}"""
-        }
-       
-        doc = TestDoc(field1="a", field2="b")
-        doc1 = TestDoc(field1="c", field2="d")
-
-        db = self.server.create_db('couchdbkit_test')
-        TestDoc._db = db
-        
-        doc.save()
-        doc1.save()
-        results = TestDoc.temp_view(design_doc)
-        self.assert_(len(results) == 2)
-        doc3 = list(results)[0]
-        self.assert_(hasattr(doc3, "field1"))
-        self.server.delete_db('couchdbkit_test')
     
     def testDocumentAttachments(self):
         db = self.server.create_db('couchdbkit_test')
@@ -460,10 +436,10 @@ class DocumentTestCase(unittest.TestCase):
         text_attachment = u"un texte attaché"
         old_rev = a._rev
 
-        a.put_attachment(text_attachment, "test", "text/plain")
+        a.put_attachment(text_attachment, "test", headers={'Content-Type': 'text/plain'})
         self.assert_(old_rev != a._rev)
         fetch_attachment = a.fetch_attachment("test")
-        self.assert_(text_attachment == fetch_attachment)
+        self.assert_(text_attachment == fetch_attachment.unicode_body)
         self.server.delete_db('couchdbkit_test')
    
 
@@ -480,7 +456,7 @@ class DocumentTestCase(unittest.TestCase):
         text_attachment = "un texte attaché"
         old_rev = a._rev
         
-        a.put_attachment(text_attachment, "test", "text/plain")
+        a.put_attachment(text_attachment, "test", headers={'Content-Type': 'text/plain'})
         a.delete_attachment('test')
         self.assertRaises(ResourceNotFound, a.fetch_attachment, 'test')
         
@@ -891,7 +867,7 @@ class PropertyTestCase(unittest.TestCase):
         
         a = A(l=["a", "b", "c"])
         a.save()
-        b = self.db.get(a._id, wrapper=A.wrap)
+        b = self.db.open_doc(a._id, wrapper=A.wrap)
         self.assert_(a.l == ["a", "b", "c"])
         b.l = []
         self.assert_(b.l == [])
@@ -1111,7 +1087,7 @@ class PropertyTestCase(unittest.TestCase):
         A2.set_db(self.db) 
         a = A2(l=["a", "b", "c"])
         a.save()
-        b = self.db.get(a._id, wrapper=A2.wrap)
+        b = self.db.open_doc(a._id, wrapper=A2.wrap)
         self.assert_(b.l == ["a", "b", "c"])
         b.l = []
         self.assert_(b.l == [])
@@ -1198,7 +1174,7 @@ class PropertyTestCase(unittest.TestCase):
         A2.set_db(self.db) 
         a = A2(d={"a": 1, "b": 2, "c": 3})
         a.save()
-        b = self.db.get(a._id, wrapper=A2.wrap)
+        b = self.db.open_doc(a._id, wrapper=A2.wrap)
         self.assert_(b.d == {"a": 1, "b": 2, "c": 3})
         b.d = {}
         self.assert_(b.d == {})

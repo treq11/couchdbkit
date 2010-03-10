@@ -7,6 +7,31 @@
 All exceptions used in couchdbkit.
 """
 
+from restkit import ResourceError
+
+class ResourceNotFound(ResourceError):
+    """ raised when a resource not found on CouchDB"""
+   
+class ResourceConflict(ResourceError):
+    """ raised when a conflict occured"""
+
+class PreconditionFailed(ResourceError):
+    """ precondition failed error """    
+    
+class RequestFailed(Exception): 
+    """ raised when an http error occurs"""
+    
+class Unauthorized(Exception):
+    """ raised when not authorized to access to CouchDB"""
+
+class BulkSaveError(Exception):
+    """ error raised when therer are conflicts in bulk save"""
+    
+    def __init__(self, docs, errors):
+        Exception.__init__(self)
+        self.docs = docs
+        self.errors = errors
+
 class InvalidAttachment(Exception):
     """ raised when an attachment is invalid """
 
@@ -31,13 +56,6 @@ class ReservedWordError(Exception):
     
 class DocsPathNotFound(Exception):
     """ exception raised when path given for docs isn't found """
-    
-class BulkSaveError(Exception):
-    """ exception raised when bulk save contain errors.
-    error are saved in `errors` property.
-    """
-    def __init__(self, errors, *args):
-        self.errors = errors
 
 class ViewServerError(Exception):
     """ exception raised by view server"""

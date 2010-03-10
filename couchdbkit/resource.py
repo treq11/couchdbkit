@@ -21,42 +21,43 @@ Example:
 """
 import base64
 import re
-import socket
 import sys
 import time
 import types
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
-import anyjson
-
-from restkit import Resource, HttpResponse
-from restkit.errors import ResourceError, RequestFailed, RequestError
-from restkit.util import url_quote
+from restkit import Resource, HttpResponse, ResourceError, request
+from restkit import util
   
 from couchdbkit import __version__
+from couchdbkit.errors import ResourceNotFound, ResourceConflict,\
+PreconditionFailed, RequestFailed, BulkSaveError
 
 USER_AGENT = 'couchdbkit/%s' % __version__
 
-class ResourceNotFound(ResourceError):
-    """ Exception raised when resource is not found"""
-
-class ResourceConflict(ResourceError):
-    """ Exception raised when there is conflict while updating"""
-
-class PreconditionFailed(ResourceError):
-    """ Exception raised when 412 HTTP error is received in response
-    to a request """
-
-RequestFailed = RequestFailed
-
-class CouchDBResponse(HttpResponse):
+class CouchdbResponse(HttpResponse):
     
     @property
     def json_body(self):
         try:
-            return anyjson.deserialize(self.body)
+            return json.load(self.body_file)
         except ValueError:
             return self.body
 
+def couchdb_version(server_uri):
+    resp = request(server_uri, headers=[("Accept", "application/json")])
+    version = json.load(resp.body_file)["version"]
+    t = []
+    for p in version.split("."):
+        try:
+            t.append(int(p))
+        except ValueError:
+            continue
+    
+    return tuple(t)
 
 class CouchdbResource(Resource):
 
@@ -67,7 +68,7 @@ class CouchdbResource(Resource):
 
         @param uri: str, full uri to the server.
         """
-        client_opts['response_class'] = CouchDBResponse
+        client_opts['response_class'] = CouchdbResponse
         
         Resource.__init__(self, uri=uri, **client_opts)
         self.safe = ":/%"
@@ -109,28 +110,15 @@ class CouchdbResource(Resource):
         headers.setdefault('Accept', 'application/json')
         headers.setdefault('User-Agent', USER_AGENT)
 
-        body = None
-        if payload is not None:
-            #TODO: handle case we want to put in payload json file.
-            if not hasattr(payload, 'read') and not isinstance(payload, basestring):
-                body = anyjson.serialize(payload).encode('utf-8')
-                headers.setdefault('Content-Type', 'application/json')
-            else:
-                body = payload
-
-        params = encode_params(params)
-        
         try:
-            resp = Resource.request(self, method, path=path,
-                             payload=body, headers=headers, **params)
-                             
+            return Resource.request(self, method, path=path,
+                             payload=payload, headers=headers, **params)           
         except ResourceError, e:
             msg = getattr(e, 'msg', '')
-            
             if e.response and msg:
                 if e.response.headers.get('content-type') == 'application/json':
                     try:
-                        msg = anyjson.deserialize(msg)
+                        msg = json.loads(str(msg))
                     except ValueError:
                         pass
                     
@@ -149,38 +137,41 @@ class CouchdbResource(Resource):
             elif e.status_int == 412:
                 raise PreconditionFailed(error, http_code=412,
                         response=e.response)
+                        
+            elif e.status_int in (401, 403):
+                raise Unauthorized(e)
             else:
-                raise
+                RequestFailed(str(e))
         except Exception, e:
-            raise RequestFailed(str(e))
-        
-        return resp
+            raise RequestFailed("unknown error [%s]" % str(e))
 
 def encode_params(params):
     """ encode parameters in json if needed """
     _params = {}
     if params:
         for name, value in params.items():
+            if value is None:
+                continue
             if name in ('key', 'startkey', 'endkey') \
-                    or not isinstance(value, basestring):
-                value = anyjson.serialize(value)
+                    or not isinstance(value, types.StringType):
+                value = json.dumps(value).encode('utf-8')
             _params[name] = value
-    return _params
-
+    return _params    
+    
 def escape_docid(docid):
     if docid.startswith('/'):
         docid = docid[1:]
     if docid.startswith('_design'):
-        docid = '_design/%s' % url_quote(docid[8:], safe='')
+        docid = '_design/%s' % util.url_quote(docid[8:], safe='')
     else:
-        docid = url_quote(docid, safe='')
+        docid = util.url_quote(docid, safe='')
     return docid
     
-re_sp = re.compile('\s')
 def encode_attachments(attachments):
     for k, v in attachments.iteritems():
         if v.get('stub', False):
             continue
         else:
+            re_sp = re.compile('\s')
             v['data'] = re_sp.sub('', base64.b64encode(v['data']))
     return attachments

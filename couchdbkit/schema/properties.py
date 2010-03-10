@@ -11,7 +11,7 @@ import datetime
 import re
 import time
 
-from couchdbkit.exceptions import *
+from couchdbkit.errors import *
 
 __all__ = ['ALLOWED_PROPERTY_TYPES', 'Property', 'StringProperty', 
         'IntegerProperty','DecimalProperty', 'BooleanProperty', 

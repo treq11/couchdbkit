@@ -3,12 +3,21 @@
 # This file is part of couchdbkit released under the MIT license. 
 # See the NOTICE for more information.
 
-import anyjson
 import asyncore
 import asynchat
 import socket
 import sys
-
+try:
+    import simplejson as json
+except ImportError:
+    import json
+    
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+    
+from couchdbkit.resource import encode_params
 class Consumer(object):
     """ Database change consumer
     
@@ -48,7 +57,7 @@ class Consumer(object):
         elif timeout:
             params["timeout"] = timeout
         if filter: params["filter"] = filter_name
-        return params
+        return encode_params(params)
         
     def fetch(self, since=None, filter_name=None):
         """ Fetch all changes and return. If since is specified, fetch all changes
@@ -64,10 +73,11 @@ class Consumer(object):
         params = {}
         if since: params['since'] = since
         if filter_name: params["filter"] = filter_name
-        resp = self.db.res.get("_changes", **params)
+        resp = self.db.get("_changes", **params)
         return resp.json_body
         
-    def wait_once(self, since=None, heartbeat=False, timeout=60000, filter_name=None):
+    def wait_once(self, since=None, heartbeat=False, timeout=60000, 
+            filter_name=None):
         """Wait for one change and return (longpoll feed) 
         
         Args:
@@ -80,14 +90,14 @@ class Consumer(object):
         """
         params = self._make_params("longpoll", since, heartbeat, 
                             timeout, filter_name)
-        resp = self.db.res.get("_changes", **params)
-        buf = ""
+        resp = self.db.get("_changes", **params)
+        buf = StringIO()
         while True:
             data = resp.body_file.read()
             if not data: break
-            buf += data
+            buf.write(data)
             
-        ret = anyjson.deserialize(buf)
+        ret = json.loads(buf.getvalue())
         for callback in self.callbacks:
             callback(ret)
         return ret
@@ -105,7 +115,7 @@ class Consumer(object):
         """
         params = self._make_params("continuous", since, heartbeat, 
                             timeout, filter_name)
-        self.resp = resp = self.db.res.get("_changes", **params)
+        self._resp = resp = self.db.get("_changes", **params)
         
         if resp.headers.get('transfer-encoding') == "chunked":
             chunked = True
@@ -123,7 +133,7 @@ class Consumer(object):
     def close(self):
         if self._resp is None:
             return
-        self._resp.http_client.maybe_close()
+        #self._resp.http_client.maybe_close()
         self._resp = None
         
         
@@ -134,7 +144,7 @@ class continuous_changes_handler(asynchat.async_chat):
         self.callbacks = callbacks
         self.chunked = chunked
         self.buf = [resp._body.tmp.read()]
-        sock = resp.http_client._sock
+        self._sock = sock = resp.http_client._sock
         asynchat.async_chat.__init__(self, sock=sock)
         if self.chunked:
             self.set_terminator("\r\n")
@@ -143,7 +153,10 @@ class continuous_changes_handler(asynchat.async_chat):
         self.chunk_left = False
         
     def handle_close(self):
-        self.resp.http_client.maybe_close()
+        try:
+            self._sock.close()
+        except:
+            pass
         
     def collect_incoming_data(self, data):
         if self.chunked:
@@ -168,6 +181,6 @@ class continuous_changes_handler(asynchat.async_chat):
             line = line.strip()
 
         if line:
-            line = anyjson.deserialize(line)
+            line = json.loads(line)
             for callback in self.callbacks:
                 callback(line)

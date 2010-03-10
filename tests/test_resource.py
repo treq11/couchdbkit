@@ -7,7 +7,7 @@ __author__ = 'benoitc@e-engura.com (Benoît Chesneau)'
 
 import unittest
 
-from restkit.errors import RequestFailed, RequestError
+from couchdbkit.errors import RequestFailed
 from couchdbkit.resource import CouchdbResource
 
 
@@ -36,13 +36,6 @@ class ServerTestCase(unittest.TestCase):
         all_dbs = self.couchdb.get('/_all_dbs').json_body
         self.assert_('couchdkbit_test' in all_dbs)
         self.couchdb.delete('/couchdkbit_test')
-
-    def testCreateEmptyDoc(self):
-        res = self.couchdb.put('/couchdkbit_test/').json_body
-        self.assert_(res['ok'] == True)
-        res = self.couchdb.post('/couchdkbit_test/', payload={}).json_body
-        self.couchdb.delete('/couchdkbit_test')
-        self.assert_(len(res) > 0)
 
     def testRequestFailed(self):
         bad = CouchdbResource('http://localhost:10000')

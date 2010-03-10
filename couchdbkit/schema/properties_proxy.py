@@ -11,7 +11,7 @@ import decimal
 import time
 
 import couchdbkit
-from couchdbkit.exceptions import *
+from couchdbkit.errors import *
 from couchdbkit.schema.properties import Property
 
 from couchdbkit.schema.base import DocumentSchema, ALLOWED_PROPERTY_TYPES
