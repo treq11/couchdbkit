@@ -53,6 +53,12 @@ class CouchdbResource(object):
         :param oauth_secret: oauth consumer secret key, str
         :param extra: dict, extra argguments passed to restkit http client.
         """
+        self.intitial = dict(
+            uri = uri,
+            oauth_key = oauth_key;
+            oauth_secret = oauth_secret,
+            extra = extra
+        )
         self.extra = extra or {}
         filters = self.extra.get('filters') or []
         
@@ -77,6 +83,23 @@ class CouchdbResource(object):
     
         self.extra['filters'] = filters
         self.uri = uri
+        
+    def __call__(self, path):
+        uri = self.initial['uri']
+        new_uri = util.make_uri(uri, path)
+        obj = type(self)(new_uri, oauth_key=self.initial['oauth_key'],
+                    oauth_secret=self.initial['oauth_secret'],
+                    **self.initial['extra'])
+        return obj
+        
+    def close(self):
+        """ Close all the connections related to the resource """
+        pool = self.extra.get('pool_instance')
+        if not pool: 
+            return
+        
+        parsed_url = urlparse.urlparse(self.uri)
+        pool.clear_host(util.parse_netloc(parsed_url))
     
     def make_params(self, params):
         params = params or {}
@@ -104,6 +127,15 @@ class CouchdbResource(object):
         while True:
             uri = make_uri(self.connection_uri, path, 
                     **self.make_params(params))
+                    
+            #  encode body if needed
+            if payload is not None:
+                #TODO: handle case we want to put in payload json file.
+                if not hasattr(payload, 'read') and \
+                        not isinstance(payload, basestring):
+                    payload = json.dumps(payload).encode('utf-8')
+                    headers.setdefault('Content-Type', 'application/json')
+                    
             # make request
             http = HttpConnection(**self.extra)
             resp = http.request(uri, method=method, body=payload, 
