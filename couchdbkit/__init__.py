@@ -3,18 +3,18 @@
 # This file is part of couchdbkit released under the MIT license. 
 # See the NOTICE for more information.
 
-version_info = (0, 4, 9)
+version_info = (0, 5, 0)
 __version__ =  ".".join(map(str, version_info))
 
 try:
-    from couchdbkit.resource import ResourceNotFound, ResourceConflict,\
+    from couchdbkit.oldclient.resource import ResourceNotFound, ResourceConflict,\
 RequestFailed, PreconditionFailed, CouchdbResource
 
     from couchdbkit.exceptions import InvalidAttachment, DuplicatePropertyError,\
 BadValueError, MultipleResultsFound, NoResultFound, ReservedWordError,\
 DocsPathNotFound, BulkSaveError
 
-    from couchdbkit.client import Server, Database, ViewResults, View, TempView
+    from couchdbkit.oldclient import Server, Database, ViewResults, View, TempView
     from couchdbkit.consumer import Consumer
     from couchdbkit.external import External
     from couchdbkit.loaders import BaseDocsLoader, FileSystemDocsLoader

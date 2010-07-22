@@ -28,7 +28,7 @@ import sys
 import anyjson
 
 from couchdbkit.exceptions import DocsPathNotFound
-from couchdbkit.resource import ResourceNotFound
+from couchdbkit.oldclient.resource import ResourceNotFound
 from couchdbkit.utils import *
 from couchdbkit.macros import *
 

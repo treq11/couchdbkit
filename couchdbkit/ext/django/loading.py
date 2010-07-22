@@ -27,7 +27,7 @@ import urlparse
 
 from couchdbkit import Server, contain, ResourceConflict
 from couchdbkit.loaders import FileSystemDocLoader
-from couchdbkit.resource import CouchdbResource, PreconditionFailed
+from couchdbkit.oldclient.resource import CouchdbResource, PreconditionFailed
 from django.conf import settings
 from django.db.models import signals, get_app
 from django.core.exceptions import ImproperlyConfigured

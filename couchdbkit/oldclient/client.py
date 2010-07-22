@@ -43,7 +43,7 @@ import anyjson
 from restkit.util import url_quote
 
 from couchdbkit.exceptions import *
-import couchdbkit.resource as resource
+from couchdbkit.oldclient import resource
 from couchdbkit.utils import validate_dbname
 
 DEFAULT_UUID_BATCH_COUNT = 1000
