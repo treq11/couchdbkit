@@ -3,7 +3,7 @@
 # This file is part of couchdbkit released under the MIT license. 
 # See the NOTICE for more information.
 
-from restkit.errors import ResourceErro
+from restkit.errors import ResourceError
 
 """
 All exceptions used in couchdbkit.
@@ -74,3 +74,4 @@ class RequestFailed(ResourceError):
     You can get the status code by e.http_code, or see anything about the 
     response via e.response. For example, the entire result body (which is 
     probably an HTML error page) is e.response.body.
+    """
