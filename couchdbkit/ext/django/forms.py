@@ -268,6 +268,8 @@ class BaseDocumentForm(BaseForm):
                 value = cleaned_data[attr_name]
                 if value is not None:
                     setattr(self.instance, attr_name, value)
+        
+        self.instance.set_id()
     
         if commit:
             self.instance.save()

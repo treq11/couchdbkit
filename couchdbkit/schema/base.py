@@ -419,6 +419,10 @@ class DocumentBase(DocumentSchema):
             raise TypeError("doc database required to save document")
         return db
 
+    def set_id(self):
+        """ Set document _id"""
+        pass
+      
     def save(self, **params):
         """ Save document in database.
 
