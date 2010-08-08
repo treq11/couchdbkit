@@ -115,12 +115,7 @@ class Property(object):
                 raise BadValueError("Property %s is required." % self.name)
         else:
             if self.choices:
-                match = False
-                for choice in self.choices:
-                    if choice == value:
-                        match = True
-                        break
-                if not match:
+                if not self.valid_value(value):
                     raise BadValueError('Property %s is %r; must be one of %r' % (
                         self.name, value, self.choices))
         if self.validators:
@@ -131,6 +126,20 @@ class Property(object):
             elif callable(self.validators):
                 self.validators(value)
         return value
+
+    def valid_value(self, value):
+        "Check to see if the provided value is a valid choice"
+        for k, v in self.choices:
+            if isinstance(v, (list, tuple)):
+                # This is an optgroup, so look inside the group for options
+                for k2, v2 in v:
+                    if value == str(k2):
+                        return True
+            else:
+                if value == str(k):
+                    return True
+        return False
+
 
     def empty(self, value):
         """ test if value is empty """

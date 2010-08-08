@@ -99,6 +99,10 @@ FIELDS_PROPERTES_MAPPING = {
     "TimeProperty": f.TimeField
 }
 
+HELPER_FIELDS_PROPERTES_MAPPING = {
+    "HelperChoicesProperty": f.ChoiceField,
+}
+
 def document_to_dict(instance, properties=None, exclude=None):
     """
     Returns a dict containing the data in ``instance`` suitable for passing as
@@ -162,9 +166,13 @@ def fields_for_document(document, properties=None, exclude=None):
                     defaults['choices'] = prop.default_value() + list(
                                     prop.choices)
                     defaults['coerce'] = prop.to_python
-                
-            field_list.append((prop.name, 
-                FIELDS_PROPERTES_MAPPING[property_class_name](**defaults)))
+                else:
+                    defaults['choices'] = list(prop.choices)
+                field_list.append((prop.name, 
+                    HELPER_FIELDS_PROPERTES_MAPPING["HelperChoicesProperty"](**defaults)))
+            else:    
+                field_list.append((prop.name, 
+                    FIELDS_PROPERTES_MAPPING[property_class_name](**defaults)))
     return SortedDict(field_list)
 
 class DocumentFormOptions(object):
